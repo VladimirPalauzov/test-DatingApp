@@ -1,12 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using DatingApp.API.Data;
+using DatingApp.API.Helpers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -30,9 +34,8 @@ namespace DatingApp.API
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddDbContext<DataContext>(x => x.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+            services.AddDbContext<DataContext>(x => x.UseSqlite(Configuration.GetConnectionString("DefaultConnection")));
             services.AddCors();
-            services.AddScoped<IAuthRepository, AuthRepository>();
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options => {
                     options.TokenValidationParameters = new TokenValidationParameters {
@@ -42,6 +45,7 @@ namespace DatingApp.API
                         ValidateAudience = false
                     };
                 });
+            services.AddTransient<IAuthRepository, AuthRepository>();
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
         }
 
@@ -54,6 +58,21 @@ namespace DatingApp.API
             }
             else
             {
+                // global exception handler
+                app.UseExceptionHandler(builer => {
+                    builer.Run(async httpContext => {
+                        httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+
+                        // get the error (if any) from  the exception
+                        var error = httpContext.Features.Get<IExceptionHandlerFeature>();
+                        if(error != null) 
+                        {
+                            httpContext.Response.AddApplicationError(error.Error.Message);
+                            await httpContext.Response.WriteAsync(error.Error.Message);
+                        }
+                    });
+                });
+
                 // app.UseHsts();
             }
 
