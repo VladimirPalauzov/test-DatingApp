@@ -49,6 +49,7 @@ namespace DatingApp.API
                         ValidateAudience = false
                     };
                 });
+            services.AddScoped<LogUserActivity>();
             services.AddScoped<IAuthRepository, AuthRepository>();
             services.AddScoped<IDatingRepository, DatingRepository>();
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1)
