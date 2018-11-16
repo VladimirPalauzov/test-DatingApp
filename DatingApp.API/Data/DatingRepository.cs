@@ -25,6 +25,13 @@ namespace DatingApp.API.Data
             _context.Remove(entity);
         }
 
+        public async Task<Like> GetLike(int likerId, int likeeId)
+        {
+            return await _context.Likes.FirstOrDefaultAsync(l => 
+               l.LikerId == likerId && l.LikeeId == likeeId
+            );
+        }
+
         public async Task<Photo> GetMainPhotoForUser(int userId)
         {
             return await _context.Photos.Where(u => u.UserId == userId)
@@ -47,6 +54,20 @@ namespace DatingApp.API.Data
 
             users = users.Where(u => u.Id != userParams.UserId);
             users = users.Where( u => u.Gender == userParams.Gender);
+
+            if (userParams.Likers)
+            {
+                var userLikers = await GetUserLikes(userParams.UserId, userParams.Likers);
+                users = users.Where(u => userLikers.Contains(u.Id));
+            }
+
+            if (userParams.Likees)
+            {
+                var userLikees = await GetUserLikes(userParams.UserId, userParams.Likers);
+                users = users.Where(u => userLikees.Contains(u.Id));
+            }
+
+
             if (userParams.maxAge != 99 || userParams.maxAge != 18)
             {
                 var minDob = DateTime.Today.AddYears(-userParams.maxAge - 1);
@@ -71,6 +92,20 @@ namespace DatingApp.API.Data
             return await PagedList<User>.CreateAsync(users, userParams.PageNumber, userParams.PageSize);
         }
 
+        private async Task<IEnumerable<int>> GetUserLikes(int id, bool likers)
+        {
+            var user = await _context.Users
+                                .Include(u => u.Likers)
+                                .Include(u => u.Likees)
+                                .FirstOrDefaultAsync(u => u.Id == id);
+
+            if (likers)
+            {
+                return user.Likers.Where(l => l.LikeeId == id).Select(l => l.LikerId);
+            } else {
+                return user.Likees.Where(l => l.LikerId == id).Select(l => l.LikeeId);
+            }
+        }
         public async Task<bool> SaveAll() =>
             await _context.SaveChangesAsync() > 0;
     }
